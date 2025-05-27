@@ -100,6 +100,7 @@ const FileUpload = ({ onUploadSuccess }) => {
     const formData = new FormData();
     formData.append("file", selectedFile);
     formData.append("title", selectedFile.name);
+    formData.append("ownerId", "hilloridesai@gmail.com");
 
     try {
       const response = await axios.post(`${API_URL}/api/files/`, formData, {

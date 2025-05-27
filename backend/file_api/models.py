@@ -32,6 +32,8 @@ class UserFile(models.Model):
         file_size (int): Size of file in bytes
         uploaded_at (datetime): Timestamp of upload
         state (str): Current state of the file (deleted or restored)
+        userIds(list): List of user ids with whom the file is shared
+        ownerId(str): Id of the user who uploaded the file
     """
     
     class FileState(models.TextChoices):
@@ -71,6 +73,16 @@ class UserFile(models.Model):
         default=FileState.RESTORED,
         help_text="Current state of the file (deleted or restored)"
     )
+    ownerId = models.CharField(
+        max_length=255,
+        help_text="UserId of the user who uploaded the file"
+    )
+    userIds = models.JSONField(
+        default=list,
+        null=True,
+        blank=True,
+        help_text="List of user ids with whom the file is shared"
+    )
     
     class Meta:
         ordering = ['-uploaded_at']
@@ -105,6 +117,7 @@ class UserFile(models.Model):
             file_extension = os.path.splitext(self.file.name)[1][1:].lower()
             self.file_type = file_extension
             self.file_size = self.file.size
+            self.ownerId = self.ownerId
             
             # Validate file type
             if file_extension not in settings.ALLOWED_FILE_EXTENSIONS:

@@ -5,10 +5,11 @@ from django.conf import settings
 
 class UserFileSerializer(serializers.ModelSerializer):
     file_url = serializers.SerializerMethodField()
+    ownerId = serializers.CharField(required=False)  # Make ownerId optional in serializer
     
     class Meta:
         model = UserFile
-        fields = ['id', 'title', 'file', 'file_type', 'file_size', 'uploaded_at', 'file_url']
+        fields = ['id', 'title', 'file', 'file_type', 'file_size', 'uploaded_at', 'file_url', 'userIds', 'ownerId']
         read_only_fields = ['id', 'file_type', 'file_size', 'uploaded_at', 'file_url']
     
     def get_file_url(self, obj):

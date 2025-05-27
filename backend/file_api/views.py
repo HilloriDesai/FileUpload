@@ -6,7 +6,7 @@ from django.http import FileResponse, HttpRequest
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.request import Request
 from rest_framework.exceptions import ValidationError, NotFound
 from .models import UserFile
@@ -35,7 +35,7 @@ class UserFileViewSet(viewsets.ModelViewSet):
     """
     queryset = UserFile.objects.all().order_by('-uploaded_at')
     serializer_class = UserFileSerializer
-    parser_classes = (MultiPartParser, FormParser)
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
     
     def get_queryset(self):
         """
@@ -45,8 +45,17 @@ class UserFileViewSet(viewsets.ModelViewSet):
         """
         if self.action == 'bin':
             return UserFile.objects.filter(state=UserFile.FileState.DELETED).order_by('-uploaded_at')
+        elif self.action == 'list_users':
+            ownerIds = UserFile.objects.values('ownerId').distinct()
+            return ownerIds
         elif self.action == 'list_restored':
-            return UserFile.objects.filter(state=UserFile.FileState.RESTORED).order_by('-uploaded_at')
+            # Filter files by ownerId
+            ownerId = self.request.query_params.get('ownerId')
+            return UserFile.objects.filter(state=UserFile.FileState.RESTORED, ownerId=ownerId).order_by('-uploaded_at')
+        elif self.action == 'list_shared':
+            # Filter files by userIds
+            userId = self.request.query_params.get('userId')
+            return UserFile.objects.filter(state=UserFile.FileState.RESTORED, userIds__contains=userId).order_by('-uploaded_at')
         return UserFile.objects.all().order_by('-uploaded_at')
     
     def _handle_exception(self, exc: Exception, context: Dict[str, Any]) -> Response:
@@ -96,7 +105,6 @@ class UserFileViewSet(viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
             self.perform_create(serializer)
             headers = self.get_success_headers(serializer.data)
-            
             logger.info(f"File uploaded successfully: {serializer.data['title']}")
             return Response(
                 serializer.data,
@@ -132,7 +140,7 @@ class UserFileViewSet(viewsets.ModelViewSet):
         
         Args:
             request: The HTTP request
-            
+            Header: ownerId
         Returns:
             Response: HTTP 200 OK with list of files
         """
@@ -144,6 +152,24 @@ class UserFileViewSet(viewsets.ModelViewSet):
             logger.error(f"Failed to list files: {str(e)}")
             return self._handle_exception(e, {'view': self})
     
+    @action(detail=False, methods=['get'])
+    def list_shared(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """
+        List all shared files.
+        
+        Args:
+            request: The HTTP request
+            
+        Returns:
+            Response: HTTP 200 OK with list of files
+        """
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            logger.error(f"Failed to list files: {str(e)}")
+            return self._handle_exception(e, {'view': self})
     @action(detail=True, methods=['post'])
     def move_to_bin(self, request: Request, pk: str = None) -> Response:
         """
@@ -277,4 +303,54 @@ class UserFileViewSet(viewsets.ModelViewSet):
             
         except Exception as e:
             logger.error(f"File download failed: {str(e)}")
+            return self._handle_exception(e, {'view': self})
+    
+    @action(detail=True, methods=['post'])
+    def share_file(self, request: Request, pk: str = None) -> Response:
+        """
+        Share a file with users (userIds in the request body in application/json format)
+        
+        Args:
+            request: The HTTP request
+            pk: The primary key of the file
+            
+        Returns:
+            Response: Success or error message
+        """
+        try: 
+            file_obj = self.get_object()
+            userIds = request.data.get('userIds', [])
+            
+            # Initialize userIds if it's None
+            if file_obj.userIds is None:
+                file_obj.userIds = []
+            
+            # Add new userIds if they don't already exist
+            for userId in userIds:
+                if userId not in file_obj.userIds:
+                    file_obj.userIds.append(userId)
+            
+            file_obj.save()
+            return Response({'message': 'File shared successfully'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Failed to share file: {str(e)}")
+            return self._handle_exception(e, {'view': self})
+      
+    @action(detail=False, methods=['get'])
+    def list_users(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """
+        List all users.
+        
+        Args:
+            request: The HTTP request
+            
+        Returns:
+            Response: HTTP 200 OK with list of users
+        """
+        try:
+            ownerIds = UserFile.objects.values('ownerId').distinct()
+            ownerIds = list(set([ownerId['ownerId'] for ownerId in ownerIds]))
+            return Response(ownerIds)
+        except Exception as e:
+            logger.error(f"Failed to list files: {str(e)}")
             return self._handle_exception(e, {'view': self})

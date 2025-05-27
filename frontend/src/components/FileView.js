@@ -1,8 +1,5 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
-
-const API_URL = "http://localhost:8000";
 
 const FileView = ({ file, content, error, onDownload }) => {
   const navigate = useNavigate();

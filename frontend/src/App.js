@@ -11,6 +11,7 @@ import FilesPage from "./pages/FilesPage";
 import FileViewPage from "./pages/FileViewPage";
 import Header from "./components/Header";
 import BinPage from "./pages/BinPage";
+import SharedFilesPage from "./pages/SharedFilesPage";
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
             <Route path="/files" element={<FilesPage />} />
             <Route path="/bin" element={<BinPage />} />
             <Route path="/files/:fileId" element={<FileViewPage />} />
+            <Route path="/shared" element={<SharedFilesPage />} />
           </Routes>
         </div>
       </div>

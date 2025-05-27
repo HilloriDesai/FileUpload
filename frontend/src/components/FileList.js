@@ -15,7 +15,11 @@ const FileList = ({ onFileSelect }) => {
   const [files, setFiles] = useState([]);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-
+  const [isSharing, setIsSharing] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [selectedFileId, setSelectedFileId] = useState(null);
+  const [selectedFileName, setSelectedFileName] = useState("");
   // API configuration
   const API_URL = "http://localhost:8000";
 
@@ -36,6 +40,66 @@ const FileList = ({ onFileSelect }) => {
   };
 
   /**
+   * Handles the file share operation
+   * @param {string} fileId - The ID of the file to share
+   */
+  const handleShareFile = async () => {
+    const response = await axios.post(
+      `${API_URL}/api/files/${selectedFileId}/share_file/`,
+      { userIds: selectedUsers },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    if (response.status === 200) {
+      showSuccessToast("File shared successfully");
+      setIsSharing(false);
+      setSelectedUsers([]);
+      setSelectedFileId(null);
+    } else {
+      showErrorToast("Failed to share file");
+    }
+  };
+
+  /**
+   * Shows the user selection modal
+   */
+  const showUserSelection = async (fileId, fileName) => {
+    //  First fetch the list of users
+    const usersResponse = await axios.get(`${API_URL}/api/files/list_users/`);
+    const users = usersResponse.data;
+    console.log(users);
+    setUsers(users);
+    setIsSharing(true);
+    setSelectedFileId(fileId);
+    setSelectedFileName(fileName);
+  };
+
+  /**
+   * Handles user selection
+   * @param {string} user - The user to select
+   */
+  const handleUserSelect = (user) => {
+    if (selectedUsers.includes(user)) {
+      setSelectedUsers(selectedUsers.filter((u) => u !== user));
+    } else {
+      setSelectedUsers([...selectedUsers, user]);
+    }
+  };
+
+  /**
+   * Closes the sharing modal and resets state
+   */
+  const closeSharingModal = () => {
+    setIsSharing(false);
+    setSelectedUsers([]);
+    setSelectedFileId(null);
+    setSelectedFileName("");
+  };
+
+  /**
    * Fetches the list of files from the API
    * @returns {Promise<void>}
    */
@@ -43,10 +107,14 @@ const FileList = ({ onFileSelect }) => {
     try {
       setIsLoading(true);
       setError(null);
-
-      const response = await axios.get(`${API_URL}/api/files/list_restored/`, {
-        timeout: 10000, // 10 second timeout
-      });
+      const ownerId = "hilloridesai@gmail.com";
+      // Set ownerId in headers
+      const response = await axios.get(
+        `${API_URL}/api/files/list_restored/?ownerId=${ownerId}`,
+        {
+          timeout: 10000, // 10 second timeout
+        }
+      );
 
       setFiles(response.data);
     } catch (err) {
@@ -164,6 +232,12 @@ const FileList = ({ onFileSelect }) => {
                   Download
                 </a>
                 <button
+                  className="text-indigo-600 hover:text-indigo-800 px-3 py-2 rounded-md text-sm font-medium"
+                  onClick={() => showUserSelection(file.id, file.title)}
+                >
+                  Share
+                </button>
+                <button
                   className="text-red-600 hover:text-red-800 px-3 py-2 rounded-md text-sm font-medium"
                   onClick={() => handleFileMoveToBin(file.id)}
                 >
@@ -172,6 +246,80 @@ const FileList = ({ onFileSelect }) => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Share Modal */}
+      {isSharing && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">
+                Share "{selectedFileName}"
+              </h3>
+              <button
+                onClick={closeSharingModal}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-sm text-gray-500 mb-2">
+                Select users to share with:
+              </p>
+              <div className="max-h-60 overflow-y-auto border rounded-md">
+                {users.map((user) => (
+                  <label
+                    key={user}
+                    className="flex items-center space-x-3 p-3 hover:bg-gray-50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedUsers.includes(user)}
+                      onChange={() => handleUserSelect(user)}
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    />
+                    <span className="text-sm text-gray-700">{user}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={closeSharingModal}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-500"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleShareFile}
+                disabled={selectedUsers.length === 0}
+                className={`px-4 py-2 text-sm font-medium text-white rounded-md ${
+                  selectedUsers.length === 0
+                    ? "bg-indigo-300 cursor-not-allowed"
+                    : "bg-indigo-600 hover:bg-indigo-700"
+                }`}
+              >
+                Share with {selectedUsers.length}{" "}
+                {selectedUsers.length === 1 ? "user" : "users"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
