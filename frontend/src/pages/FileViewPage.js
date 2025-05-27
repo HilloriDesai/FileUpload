@@ -14,7 +14,9 @@ const FileViewPage = () => {
 
   const fetchFileDetails = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/files/${fileId}/`);
+      const response = await axios.get(
+        `${API_URL}/api/files/list_restored/${fileId}/`
+      );
       setFile(response.data);
 
       // Fetch file content based on file type

@@ -10,6 +10,7 @@ import UploadPage from "./pages/UploadPage";
 import FilesPage from "./pages/FilesPage";
 import FileViewPage from "./pages/FileViewPage";
 import Header from "./components/Header";
+import BinPage from "./pages/BinPage";
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
             <Route path="/" element={<Navigate to="/upload" replace />} />
             <Route path="/upload" element={<UploadPage />} />
             <Route path="/files" element={<FilesPage />} />
+            <Route path="/bin" element={<BinPage />} />
             <Route path="/files/:fileId" element={<FileViewPage />} />
           </Routes>
         </div>

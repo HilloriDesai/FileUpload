@@ -24,6 +24,9 @@ class UserFileViewSet(viewsets.ModelViewSet):
     - Uploading new files
     - Downloading existing files
     - Viewing file details
+    - Moving files to bin
+    - Restoring files from bin
+    - Permanently deleting files
     
     Attributes:
         queryset: Base queryset for file operations
@@ -33,6 +36,18 @@ class UserFileViewSet(viewsets.ModelViewSet):
     queryset = UserFile.objects.all().order_by('-uploaded_at')
     serializer_class = UserFileSerializer
     parser_classes = (MultiPartParser, FormParser)
+    
+    def get_queryset(self):
+        """
+        Get the appropriate queryset based on the action.
+        For list action, only show restored files.
+        For bin action, only show deleted files.
+        """
+        if self.action == 'bin':
+            return UserFile.objects.filter(state=UserFile.FileState.DELETED).order_by('-uploaded_at')
+        elif self.action == 'list_restored':
+            return UserFile.objects.filter(state=UserFile.FileState.RESTORED).order_by('-uploaded_at')
+        return UserFile.objects.all().order_by('-uploaded_at')
     
     def _handle_exception(self, exc: Exception, context: Dict[str, Any]) -> Response:
         """
@@ -108,6 +123,128 @@ class UserFileViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         except Exception as e:
             logger.error(f"Failed to list files: {str(e)}")
+            return self._handle_exception(e, {'view': self})
+    
+    @action(detail=False, methods=['get'])
+    def list_restored(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """
+        List all restored files.
+        
+        Args:
+            request: The HTTP request
+            
+        Returns:
+            Response: HTTP 200 OK with list of files
+        """
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            logger.error(f"Failed to list files: {str(e)}")
+            return self._handle_exception(e, {'view': self})
+    
+    @action(detail=True, methods=['post'])
+    def move_to_bin(self, request: Request, pk: str = None) -> Response:
+        """
+        Move a file to the bin by marking it as deleted.
+        
+        Args:
+            request: The HTTP request
+            pk: The primary key of the file
+            
+        Returns:
+            Response: Success or error message
+        """
+        try:
+            file_obj = self.get_object()
+            file_obj.state = UserFile.FileState.DELETED
+            file_obj.save()
+            
+            logger.info(f"File moved to bin: {file_obj.title}")
+            return Response(
+                {'message': 'File moved to bin successfully'},
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            logger.error(f"Failed to move file to bin: {str(e)}")
+            return self._handle_exception(e, {'view': self})
+    
+    @action(detail=True, methods=['post'])
+    def restore(self, request: Request, pk: str = None) -> Response:
+        """
+        Restore a file from the bin.
+        
+        Args:
+            request: The HTTP request
+            pk: The primary key of the file
+            
+        Returns:
+            Response: Success or error message
+        """
+        try:
+            file_obj = self.get_object()
+            file_obj.state = UserFile.FileState.RESTORED
+            file_obj.save()
+            
+            logger.info(f"File restored: {file_obj.title}")
+            return Response(
+                {'message': 'File restored successfully'},
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            logger.error(f"Failed to restore file: {str(e)}")
+            return self._handle_exception(e, {'view': self})
+    
+    @action(detail=True, methods=['delete'])
+    def permanent_delete(self, request: Request, pk: str = None) -> Response:
+        """
+        Permanently delete a file from the system.
+        
+        Args:
+            request: The HTTP request
+            pk: The primary key of the file
+            
+        Returns:
+            Response: Success or error message
+        """
+        try:
+            file_obj = self.get_object()
+            file_path = file_obj.file.path
+            
+            # Delete the actual file from storage
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            
+            # Delete the database record
+            file_obj.delete()
+            
+            logger.info(f"File permanently deleted: {file_obj.title}")
+            return Response(
+                {'message': 'File permanently deleted'},
+                status=status.HTTP_204_NO_CONTENT
+            )
+        except Exception as e:
+            logger.error(f"Failed to permanently delete file: {str(e)}")
+            return self._handle_exception(e, {'view': self})
+    
+    @action(detail=False, methods=['get'])
+    def bin(self, request: Request) -> Response:
+        """
+        List all files in the bin (deleted state).
+        
+        Args:
+            request: The HTTP request
+            
+        Returns:
+            Response: HTTP 200 OK with list of deleted files
+        """
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            logger.error(f"Failed to list bin files: {str(e)}")
             return self._handle_exception(e, {'view': self})
     
     @action(detail=True, methods=['get'])

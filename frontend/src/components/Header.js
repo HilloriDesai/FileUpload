@@ -70,6 +70,9 @@ const Header = ({ title = "Typeface" }) => {
             <NavLink to="/files" isActive={isActive("/files")}>
               All Files
             </NavLink>
+            <NavLink to="/bin" isActive={isActive("/bin")}>
+              Bin
+            </NavLink>
           </nav>
         </div>
       </div>

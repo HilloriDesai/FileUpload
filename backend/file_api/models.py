@@ -31,7 +31,12 @@ class UserFile(models.Model):
         file_type (str): File extension/type
         file_size (int): Size of file in bytes
         uploaded_at (datetime): Timestamp of upload
+        state (str): Current state of the file (deleted or restored)
     """
+    
+    class FileState(models.TextChoices):
+        DELETED = 'deleted', 'Deleted'
+        RESTORED = 'restored', 'Restored'
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(
@@ -59,6 +64,12 @@ class UserFile(models.Model):
     uploaded_at = models.DateTimeField(
         auto_now_add=True,
         help_text="Timestamp when the file was uploaded"
+    )
+    state = models.CharField(
+        max_length=10,
+        choices=FileState.choices,
+        default=FileState.RESTORED,
+        help_text="Current state of the file (deleted or restored)"
     )
     
     class Meta:

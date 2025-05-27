@@ -1,17 +1,15 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Link } from "react-router-dom";
 import axios from "axios";
 import PropTypes from "prop-types";
 import { showSuccessToast, showErrorToast } from "../services/toast";
 
 /**
- * FileList component for displaying a list of uploaded files
+ * DeletedFileList component for displaying a list of deleted files
  *
  * @component
  * @param {Object} props - Component props
- * @param {Function} props.onFileSelect - Optional callback when a file is selected
  */
-const FileList = ({ onFileSelect }) => {
+const DeletedFileList = ({ onFileSelect }) => {
   const [files, setFiles] = useState([]);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -20,18 +18,34 @@ const FileList = ({ onFileSelect }) => {
   const API_URL = "http://localhost:8000";
 
   /**
-   * Handles the file move to bin operation
-   * @param {string} fileId - The ID of the file to move to bin
+   * Handles the file permanent delete operation
+   * @param {string} fileId - The ID of the file to permanently delete
    */
-  const handleFileMoveToBin = async (fileId) => {
-    console.log(`Moving file with ID: ${fileId} to bin`);
+  const handleFilePermanentDelete = async (fileId) => {
+    console.log(`Permanently deleting file with ID: ${fileId}`);
+    const response = await axios.delete(
+      `${API_URL}/api/files/${fileId}/permanent_delete/`
+    );
+    if (response.status === 204) {
+      showSuccessToast("File permanently deleted successfully");
+    } else {
+      showErrorToast("Failed to permanently delete file");
+    }
+  };
+
+  /**
+   * Handles the file restore operation
+   * @param {string} fileId - The ID of the file to restore
+   */
+  const handleFileRestore = async (fileId) => {
+    console.log(`Restoring file with ID: ${fileId}`);
     const response = await axios.post(
-      `${API_URL}/api/files/${fileId}/move_to_bin/`
+      `${API_URL}/api/files/${fileId}/restore/`
     );
     if (response.status === 200) {
-      showSuccessToast("File moved to bin successfully");
+      showSuccessToast("File restored successfully");
     } else {
-      showErrorToast("Failed to move file to bin");
+      showErrorToast("Failed to restore file");
     }
   };
 
@@ -39,15 +53,15 @@ const FileList = ({ onFileSelect }) => {
    * Fetches the list of files from the API
    * @returns {Promise<void>}
    */
-  const fetchFiles = useCallback(async () => {
+  const fetchDeletedFiles = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      const response = await axios.get(`${API_URL}/api/files/list_restored/`, {
+      const response = await axios.get(`${API_URL}/api/files/bin/`, {
         timeout: 10000, // 10 second timeout
       });
-
+      console.log("bin data", response.data);
       setFiles(response.data);
     } catch (err) {
       console.error("Error fetching files:", err);
@@ -74,8 +88,8 @@ const FileList = ({ onFileSelect }) => {
 
   // Fetch files on component mount
   useEffect(() => {
-    fetchFiles();
-  }, [fetchFiles]);
+    fetchDeletedFiles();
+  }, [fetchDeletedFiles]);
 
   /**
    * Formats the file size in a human-readable format
@@ -88,16 +102,6 @@ const FileList = ({ onFileSelect }) => {
     const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
-
-  /**
-   * Handles file selection
-   * @param {Object} file - The selected file
-   */
-  const handleFileSelect = (file) => {
-    if (onFileSelect) {
-      onFileSelect(file);
-    }
   };
 
   if (isLoading) {
@@ -117,7 +121,7 @@ const FileList = ({ onFileSelect }) => {
         >
           <p>{error}</p>
           <button
-            onClick={fetchFiles}
+            onClick={fetchDeletedFiles}
             className="mt-2 text-sm underline hover:text-red-800"
           >
             Try again
@@ -149,25 +153,17 @@ const FileList = ({ onFileSelect }) => {
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                <Link
-                  to={`/files/${file.id}`}
-                  className="text-blue-600 hover:text-blue-800 px-3 py-2 rounded-md text-sm font-medium"
-                  onClick={() => handleFileSelect(file)}
-                >
-                  View
-                </Link>
-                <a
-                  href={`${API_URL}/api/files/${file.id}/download`}
+                <button
                   className="text-green-600 hover:text-green-800 px-3 py-2 rounded-md text-sm font-medium"
-                  download
+                  onClick={() => handleFileRestore(file.id)}
                 >
-                  Download
-                </a>
+                  Restore
+                </button>
                 <button
                   className="text-red-600 hover:text-red-800 px-3 py-2 rounded-md text-sm font-medium"
-                  onClick={() => handleFileMoveToBin(file.id)}
+                  onClick={() => handleFilePermanentDelete(file.id)}
                 >
-                  Move to Bin
+                  Delete
                 </button>
               </div>
             </div>
@@ -178,8 +174,8 @@ const FileList = ({ onFileSelect }) => {
   );
 };
 
-FileList.propTypes = {
+DeletedFileList.propTypes = {
   onFileSelect: PropTypes.func,
 };
 
-export default FileList;
+export default DeletedFileList;
